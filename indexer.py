@@ -12,10 +12,11 @@ from stemmer import Stemmer
 DICT_DIST = "./dist/"
 POSTING_DIST = "./dist/postings-lists/"
 VECTOR_DIST = "./dist/vectors/"
+TRAIN_SIZE = 55
 
 
 class Posting:
-    _docId: int
+    _docId: str
     _positions: [int]
 
     def __init__(self, doc_id):
@@ -55,7 +56,7 @@ class PostingList:
     def getId(self):
         return self._id
 
-    def addToken(self, token: Token, doc_id: int):
+    def addToken(self, token: Token, doc_id: str):
         p: Posting
         for p in self._list:
             if p.getDocId() == doc_id:
@@ -93,7 +94,7 @@ class PostingList:
                 result.append(max_posting)
         return result
 
-    def getPosting(self, doc_id: int) -> Posting or None:
+    def getPosting(self, doc_id: str) -> Posting or None:
         posting: Posting
         for posting in self._list:
             if posting.getDocId() == doc_id:
@@ -117,9 +118,9 @@ class PostingList:
                     raise
         try:
             with open(pl_addr, 'wb') as pl_file:
-                pl = pickle.dump(self, pl_file)
+                pickle.dump(self, pl_file)
                 pl_file.close()
-        except (FileNotFoundError, FileExistsError) as e:
+        except (FileNotFoundError, FileExistsError):
             print("error")
 
     def __eq__(self, other):
@@ -147,7 +148,7 @@ class Dictionary:
         if load:
             self._load()
 
-    def addToken(self, token: Token, doc_id: int):
+    def addToken(self, token: Token, doc_id: str):
         term = token.getWord()
         pl: PostingList
         x = self.getPostingList(term)
@@ -184,14 +185,14 @@ class Dictionary:
         pl = self.getPostingList(term)
         return 1 / len(pl.getPostings()) if pl is not None else 0
 
-    def getTF(self, term: str, doc_id: int) -> int:
+    def getTF(self, term: str, doc_id: str) -> int:
         posting: Posting
         posting = self.getPostingList(term).getPosting(doc_id)
         if posting is None:
             return 0
         return len(posting.getPositions())
 
-    def _getVector(self, doc_id: int):
+    def _getVector(self, doc_id: str):
         vector: dict = {}
         term: str
         pl_id: int
@@ -205,11 +206,11 @@ class Dictionary:
                 vector[term] = weight
         return vector
 
-    def getVector(self, doc_id: int):
+    def getVector(self, doc_id: str):
         # return self._getVector(doc_id)
         return self.loadVector(doc_id)
 
-    def saveVector(self, doc_id: int):
+    def saveVector(self, doc_id: str):
         vector = self._getVector(doc_id)
         vec_addr: str = VECTOR_DIST + str(doc_id) + '.vec'
         if not os.path.exists(os.path.dirname(vec_addr)):
@@ -221,11 +222,11 @@ class Dictionary:
         try:
             with open(vec_addr, 'w') as outFile:
                 json.dump(vector, outFile)
-        except (FileNotFoundError, FileExistsError) as e:
+        except (FileNotFoundError, FileExistsError):
             print("error")
 
     @staticmethod
-    def loadVector(doc_id: int):
+    def loadVector(doc_id: str):
         vec_addr: str = VECTOR_DIST + str(doc_id) + '.vec'
         vector: dict
         if not os.path.exists(os.path.dirname(vec_addr)):
@@ -238,7 +239,7 @@ class Dictionary:
             with open(vec_addr, 'r') as inputFile:
                 vector = json.load(inputFile)
             return vector
-        except (FileNotFoundError, FileExistsError) as e:
+        except (FileNotFoundError, FileExistsError):
             print("error")
 
     @staticmethod
@@ -250,7 +251,7 @@ class Dictionary:
             weight = (1 + math.log(tf))
         else:
             pass
-            # weight = (1 + math.log(tf)) * math.log(DOCS_SIZE * idf)
+            weight = (1 + math.log(tf)) * math.log(TRAIN_SIZE * idf)
         return weight
 
     def generateChampions(self):
@@ -263,6 +264,40 @@ class Dictionary:
             cl = ChampionList(term, pl_id, pl)
             cl.save()
 
+    @staticmethod
+    def addVectors(vec1: dict, vec2: dict) -> dict:
+        result: dict = {}
+        for key in vec1.keys():
+            if key in vec2.keys():
+                result[key] = vec1[key] + vec2[key]
+            else:
+                result[key] = vec1[key]
+        for key in vec2.keys():
+            if key not in vec1.keys():
+                result[key] = vec2[key]
+        return result
+
+    def getCentroids(self):
+        result: list = []
+        for _class in range(1, 6):
+            _centroid_dir = "./dist/centroids/" + str(_class) + ".vec"
+            import pickle
+            vector: dict
+            if not os.path.exists(os.path.dirname(_centroid_dir)):
+                try:
+                    os.makedirs(os.path.dirname(_centroid_dir))
+                except OSError as exc:  # Guard against race condition
+                    if exc.errno != errno.EEXIST:
+                        raise
+            try:
+                with open(_centroid_dir, 'r') as inputFile:
+                    vector = json.load(inputFile)
+                    inputFile.close()
+                result.append((_class, vector))
+            except (FileNotFoundError, FileExistsError):
+                print("error")
+        return result
+
     def _load(self):
         dic_addr: str = DICT_DIST + 'dictionary.json'
         if not os.path.exists(os.path.dirname(dic_addr)):
@@ -274,7 +309,7 @@ class Dictionary:
         try:
             with open(dic_addr, 'r') as inputFile:
                 self._dict = json.load(inputFile)
-        except (FileNotFoundError, FileExistsError) as e:
+        except (FileNotFoundError, FileExistsError):
             print("error")
 
     def _save(self):
@@ -288,7 +323,7 @@ class Dictionary:
         try:
             with open(dic_addr, 'w') as outFile:
                 json.dump(self._dict, outFile)
-        except (FileNotFoundError, FileExistsError) as e:
+        except (FileNotFoundError, FileExistsError):
             print("error")
 
     def __str__(self):
@@ -299,49 +334,80 @@ class Indexer:
     _docs_size: int
     _docs_dir: str
 
-    def __init__(self):
-        self.tokenizer = Tokenizer()
-        self.stemmer = Stemmer()
-        self.dictionary = Dictionary(load=False)
+    def __init__(self, dictionary_load=False):
+        self._tokenizer = Tokenizer()
+        self._stemmer = Stemmer()
+        self._dictionary = Dictionary(load=dictionary_load)
+
+    def train(self):
         self._clean()
-        self._index("./dataset/train/math/", 2)
+        self.makeVectors()
+        self.makeCentroids()
+
+    def makeVectors(self):
+        self._index("./dataset/train/history/", 1)
+        self._index("./dataset/train/hygin/", 2)
+        self._index("./dataset/train/math/", 3)
+        self._index("./dataset/train/physics/", 4)
+        self._index("./dataset/train/technology/", 5)
+        print("generating champions list")
+        self._dictionary.generateChampions()
+        print("caching vectors")
+        for _class in range(1, 6):
+            for cnt in range(1, TRAIN_SIZE + 1):
+                print(f"progress: {round((cnt / TRAIN_SIZE) * (_class / 5) * 100, 2)} %")
+                doc_id = str(_class) + "-" + str(cnt)
+                self._dictionary.saveVector(doc_id)
+
+    def makeCentroids(self):
+        _class: int
+        _cnt: int
+        for _class in range(1, 6):
+            _sum: dict = {}
+            _result: dict = {}
+            for _cnt in range(1, TRAIN_SIZE + 1):
+                doc_id: str = str(_class) + "-" + str(_cnt)
+                vec = self._dictionary.getVector(doc_id)
+                _sum = self._dictionary.addVectors(_sum, vec)
+            for key, val in _sum.items():
+                _result[key] = val / TRAIN_SIZE
+
+            vec_addr: str = "./dist/centroids/" + str(_class) + '.vec'
+            if not os.path.exists(os.path.dirname(vec_addr)):
+                try:
+                    os.makedirs(os.path.dirname(vec_addr))
+                except OSError as exc:  # Guard against race condition
+                    if exc.errno != errno.EEXIST:
+                        raise
+            try:
+                with open(vec_addr, 'w') as outFile:
+                    json.dump(_result, outFile)
+            except (FileNotFoundError, FileExistsError):
+                print("error")
 
     def _index(self, _dir: str, _class: int):
         from os import listdir
         from os.path import isfile, join
         only_files = [f for f in listdir(_dir) if isfile(join(_dir, f))]
-        print(len(only_files))
-
-    # def _setup(self):
-    #     from os import listdir
-    #     from os.path import isfile, join
-    #     my_path = [
-    #
-    #     ]
-    #     only_files = [f for f in listdir(my_path) if isfile(join(my_path, f))]
-    #     for doc_id in range(1, self._docs_size + 1):
-    #         print(f"progress: {round((doc_id / (self._docs_size + 1)) * 100, 2)} %")
-    #         # doc = self.docLoader.getDoc(doc_id)
-    #         tokens = self.tokenizer.tokenizeDoc(doc)
-    #         # print("tokens: ")
-    #         # for token in tokens:
-    #         # print(token)
-    #         normalized_words = self.stemmer.normalize_list(tokens)
-    #         # print("normalized_words: ")
-    #         # for token in normalized_words:
-    #         # print(token)
-    #         for token in normalized_words:
-    #             self.dictionary.addToken(token, doc_id)
-    #     print("generating champions list")
-    #     self.dictionary.generateChampions()
-    #     print("caching vectors")
-    #     for doc_id in range(1, DOCS_SIZE + 1):
-    #         self.dictionary.saveVector(doc_id)
+        doc: str
+        cnt: int = 0
+        print(f"indexing class {_class}")
+        for _filename in only_files:
+            print(f"progress: {round((cnt / TRAIN_SIZE) * 100, 2)}%")
+            cnt += 1
+            doc_id = str(_class) + "-" + str(cnt)
+            with open(_dir + _filename, "r", encoding='utf-8') as file:
+                doc = file.read()
+                file.close()
+            tokens = self._tokenizer.tokenizeDoc(doc)
+            normalized = self._stemmer.normalize_list(tokens)
+            for token in normalized:
+                self._dictionary.addToken(token, doc_id)
 
     @staticmethod
     def _clean():
         if os.path.exists(os.path.dirname("./dist")):
             try:
                 shutil.rmtree("./dist")
-            except (FileNotFoundError, FileExistsError) as e:
-                print("error")
+            except (FileNotFoundError, FileExistsError):
+                print("clean error")
