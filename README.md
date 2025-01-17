@@ -18,4 +18,4 @@ This project demonstrates the use of information retrieval techniques, particula
 This project was developed as part of the **Information Retrieval course** at **Amirkabir University of Technology (AUT)**.  
 
 ## License  
-This project is licensed under the AUT License. 
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.  
