@@ -1,20 +1,21 @@
-# Search Engine  
+# Wikipedia Document Clustering  
 
-A Python-based search engine developed for the **Information Retrieval course** at **Amirkabir University of Technology (AUT)**. This project implements core information retrieval techniques to create an efficient and functional search system.  
+A project to cluster Wikipedia documents using the **Rocchio Algorithm**. This project was developed as part of the **Information Retrieval course** at **Amirkabir University of Technology (AUT)**. It focuses on applying relevance feedback techniques for document clustering and organization.  
 
 ## Features  
-- **TF-IDF Ranking**: Uses Term Frequency-Inverse Document Frequency for relevance scoring.  
-- **Index Elimination**: Implements index elimination to optimize query processing.  
-- **Champion Lists**: Supports champion lists to improve search efficiency by focusing on top-ranked documents.  
+- **Rocchio Algorithm**: Implements the Rocchio method for clustering documents based on relevance feedback.  
+- **TF-IDF Vectorization**: Transforms text documents into feature vectors for clustering.  
+- **Wikipedia Data**: Uses a subset of Wikipedia documents for analysis and clustering.  
 
 ## Technology Stack  
 - **Programming Language**: Python  
+- **Libraries**: NumPy, Pandas, Scikit-learn  
 
 ## Purpose  
-This project demonstrates foundational information retrieval concepts and techniques, focusing on implementing and optimizing a search engine for textual data.  
+This project demonstrates the use of information retrieval techniques, particularly relevance feedback, for clustering and organizing text documents in a meaningful way.  
 
 ## Acknowledgements  
 This project was developed as part of the **Information Retrieval course** at **Amirkabir University of Technology (AUT)**.  
 
 ## License  
-This project is licensed under the AUT License.
+This project is licensed under the AUT License. 
